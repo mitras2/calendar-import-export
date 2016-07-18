@@ -330,7 +330,43 @@ public class SaveCalendar extends RunnableWithProgress {
             isTransparent = true;
             Date start = getDateTime(cur, Events.DTSTART, null, null);
             l.add(new DtStart(start));
-            dtEnd = new DtEnd(utcDateFromMs(start.getTime() + DateUtils.DAY_IN_MILLIS));
+
+            String endTz = Events.EVENT_END_TIMEZONE;
+            if (endTz == null) {
+                endTz = Events.EVENT_TIMEZONE;
+            }
+            Date dateEnd = getDateTime(cur, Events.DTEND, endTz, cal);
+
+            /*
+            Log.d("mitras2_cal", "The 'all-day'-event is: "  + summary +".\n" +
+                    "It's duration is: " + getString(cur, Events.DURATION) + ".\n" +
+                    "StartDate is: " + start.toString() + " and the\n" +
+                    "EndDate is: " + dateEnd.toString());
+            */
+
+            if(dateEnd == null || dateEnd.getTime() < start.getTime()+DateUtils.DAY_IN_MILLIS){
+                // Error-Handling, for all-day-events that only run one day
+                dtEnd = new DtEnd(utcDateFromMs(start.getTime() + DateUtils.DAY_IN_MILLIS));
+            } else {
+                if(dateEnd.getTime() % DateUtils.DAY_IN_MILLIS == 0){
+                    dtEnd = new DtEnd(utcDateFromMs(dateEnd.getTime()));
+                } else {
+                    // If the events does not end exactly at the end of a day we fill the day up
+                    // or we cut it, depending where the endDate was closer to
+
+                    Long dateEndCorrection = 0L;
+                    if(dateEnd.getTime() % DateUtils.DAY_IN_MILLIS >= (DateUtils.DAY_IN_MILLIS/2L)){
+                        //If the dateEnd is beyond 12am  fill the day up till the next midnight
+                        dateEndCorrection = (DateUtils.DAY_IN_MILLIS - (dateEnd.getTime() % DateUtils.DAY_IN_MILLIS));
+                    } else {
+                        //If the dateEnd is somewhere bevor 12am cut the day to its beginning
+                        dateEndCorrection = (-dateEnd.getTime() % DateUtils.DAY_IN_MILLIS);
+                    }
+                    dtEnd = new DtEnd(utcDateFromMs(dateEnd.getTime() + dateEndCorrection));
+                }
+            }
+
+
             l.add(dtEnd);
         } else {
             // Regular or zero-time event. Start date must be a date-time
